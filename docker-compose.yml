@@ -1,7 +1,6 @@
 services:
   auto-rescale:
     image: ghcr.io/patrickhilker/hetzner-auto-rescale:latest
-    container_name: hetzner-auto-rescale
     restart: unless-stopped
     env_file: .env
     pull_policy: always
