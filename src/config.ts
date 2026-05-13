@@ -1,6 +1,7 @@
 export interface Config {
   token: string;
   labelKey: string;
+  upgradeDiskLabelKey: string;
   targetsSeparator: string;
   pollIntervalMs: number;
   actionPollIntervalMs: number;
@@ -54,6 +55,7 @@ export function loadConfig(): Config {
   return {
     token,
     labelKey: optional("LABEL_KEY") ?? "hetzner-auto-rescale/targets",
+    upgradeDiskLabelKey: optional("UPGRADE_DISK_LABEL_KEY") ?? "hetzner-auto-rescale/upgrade-disk",
     targetsSeparator: separator,
     pollIntervalMs: (pollIntervalSec ? parsePositiveInt(pollIntervalSec, "POLL_INTERVAL_SECONDS") : 60) * 1000,
     actionPollIntervalMs: (actionPollSec ? parsePositiveInt(actionPollSec, "ACTION_POLL_INTERVAL_SECONDS") : 3) * 1000,

@@ -172,10 +172,15 @@ async function powerOn(client: HCloudClient, serverId: number): Promise<ActionRe
   return data.action;
 }
 
-async function changeType(client: HCloudClient, serverId: number, targetType: string): Promise<ActionRef> {
+async function changeType(
+  client: HCloudClient,
+  serverId: number,
+  targetType: string,
+  upgradeDisk: boolean,
+): Promise<ActionRef> {
   const { data, error } = await client.POST("/servers/{id}/actions/change_type", {
     params: { path: { id: serverId } },
-    body: { server_type: targetType, upgrade_disk: false },
+    body: { server_type: targetType, upgrade_disk: upgradeDisk },
   });
   if (error || !data) {
     throw new HCloudApiError(`change_type failed for server ${serverId}`, error);
@@ -213,6 +218,7 @@ export async function rescaleServer(
   client: HCloudClient,
   server: LabeledServer,
   targetType: string,
+  upgradeDisk: boolean,
   actionPollIntervalMs: number,
   actionTimeoutMs: number,
 ): Promise<void> {
@@ -223,6 +229,7 @@ export async function rescaleServer(
     from: server.currentTypeName,
     to: targetType,
     wasRunning,
+    upgradeDisk,
   });
 
   if (wasRunning) {
@@ -241,9 +248,9 @@ export async function rescaleServer(
     server: server.name,
     from: server.currentTypeName,
     to: targetType,
-    upgradeDisk: false,
+    upgradeDisk,
   });
-  const changeAction = await changeType(client, server.id, targetType);
+  const changeAction = await changeType(client, server.id, targetType, upgradeDisk);
   log.info("change_type action accepted", { server: server.name, actionId: changeAction.id });
   await pollAction(client, changeAction.id, "change_type", actionPollIntervalMs, actionTimeoutMs);
   log.info("Server type changed", { server: server.name, to: targetType });
