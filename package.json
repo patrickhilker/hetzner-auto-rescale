@@ -1,0 +1,29 @@
+{
+  "name": "hetzner-auto-rescale",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Watches Hetzner Cloud for availability of a higher server type and rescales automatically.",
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "generate": "openapi-typescript https://raw.githubusercontent.com/MaximilianKoestler/hcloud-openapi/v0.28.0/openapi/hcloud.json -o src/generated/hcloud.d.ts",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "openapi-typescript": "^7.5.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+services:
+  auto-rescale:
+    build: .
+    image: hetzner-auto-rescale:latest
+    container_name: hetzner-auto-rescale
+    restart: unless-stopped
+    env_file: .env

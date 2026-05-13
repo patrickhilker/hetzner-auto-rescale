@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+dist
+.git
+.env
+.env.*
+!.env.example
+*.log
+.idea
+.vscode
+src/generated
