@@ -1,7 +1,12 @@
 services:
   auto-rescale:
-    build: .
-    image: hetzner-auto-rescale:latest
+    image: ghcr.io/patrickhilker/hetzner-auto-rescale:latest
     container_name: hetzner-auto-rescale
     restart: unless-stopped
     env_file: .env
+    pull_policy: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

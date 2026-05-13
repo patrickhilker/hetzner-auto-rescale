@@ -68,18 +68,25 @@ pnpm dev
 
 ## Mit Docker
 
-Lokal bauen und starten:
+Auf deinem Server reicht das `docker-compose.yml` aus diesem Repo (oder einfach manuell anlegen) plus eine `.env`:
 
 ```bash
-cp .env.example .env
-# .env ausfüllen (HCLOUD_TOKEN reicht)
-docker compose up --build
+mkdir hetzner-auto-rescale && cd hetzner-auto-rescale
+curl -fsSLO https://raw.githubusercontent.com/patrickhilker/hetzner-auto-rescale/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/patrickhilker/hetzner-auto-rescale/main/.env.example
+mv .env.example .env
+# .env ausfüllen (HCLOUD_TOKEN reicht für den ersten Test)
+docker compose up -d
+docker compose logs -f
 ```
 
-Oder das bereits gebaute Image aus dem GitHub Container Registry ziehen:
+Das Compose-File zieht das fertige Image aus dem GitHub Container Registry (`ghcr.io/patrickhilker/hetzner-auto-rescale:latest`, multi-arch amd64+arm64) und läuft mit `restart: unless-stopped`. Bei jedem `docker compose up` wird durch `pull_policy: always` automatisch die aktuelle Version gezogen.
+
+Builds passieren via GitHub Actions automatisch für jeden Push auf `main` (Tags: `latest`, `main`, `sha-<short>`) und für Release-Tags wie `v1.2.3`.
+
+Alternativ ohne Compose:
 
 ```bash
-docker run --rm --env-file .env ghcr.io/patrickhilker/hetzner-auto-rescale:latest
+docker run -d --name hetzner-auto-rescale --restart unless-stopped \
+  --env-file .env ghcr.io/patrickhilker/hetzner-auto-rescale:latest
 ```
-
-Der Container läuft mit `restart: unless-stopped` und pollt dauerhaft die Hetzner API. Builds passieren via GitHub Actions automatisch für jeden Push auf `main` (Tags: `latest`, `main`, `sha-<short>`) und für Release-Tags wie `v1.2.3`.
