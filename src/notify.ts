@@ -8,6 +8,14 @@ export interface RescaleEvent {
   datacenter: string;
 }
 
+type NotificationLevel = "info" | "success" | "error";
+
+interface Notification {
+  level: NotificationLevel;
+  title: string;
+  body: string;
+}
+
 function ntfyAuthHeader(cfg: Config): string | undefined {
   if (cfg.ntfyToken) return `Bearer ${cfg.ntfyToken}`;
   if (cfg.ntfyUser && cfg.ntfyPassword) {
@@ -17,27 +25,32 @@ function ntfyAuthHeader(cfg: Config): string | undefined {
   return undefined;
 }
 
-interface NtfyMessage {
-  title: string;
-  body: string;
-  tags: string;
-  priority: "min" | "low" | "default" | "high" | "max";
-}
+const ntfyPriority: Record<NotificationLevel, "low" | "default" | "high"> = {
+  info: "low",
+  success: "default",
+  error: "high",
+};
 
-async function postNtfy(cfg: Config, msg: NtfyMessage): Promise<void> {
+const ntfyTags: Record<NotificationLevel, string> = {
+  info: "white_check_mark",
+  success: "rocket,hetzner",
+  error: "warning",
+};
+
+async function postNtfy(cfg: Config, n: Notification): Promise<void> {
   if (!cfg.ntfyTopic) return;
   const url = `${cfg.ntfyServer.replace(/\/+$/, "")}/${encodeURIComponent(cfg.ntfyTopic)}`;
   const headers: Record<string, string> = {
     "Content-Type": "text/plain; charset=utf-8",
-    Title: msg.title,
-    Tags: msg.tags,
-    Priority: msg.priority,
+    Title: n.title,
+    Tags: ntfyTags[n.level],
+    Priority: ntfyPriority[n.level],
   };
   const auth = ntfyAuthHeader(cfg);
   if (auth) headers.Authorization = auth;
-  log.info("Posting ntfy notification", { url, title: msg.title, priority: msg.priority });
+  log.info("Posting ntfy notification", { url, title: n.title, priority: ntfyPriority[n.level] });
   try {
-    const res = await fetch(url, { method: "POST", headers, body: msg.body });
+    const res = await fetch(url, { method: "POST", headers, body: n.body });
     if (!res.ok) {
       log.warn("ntfy returned non-2xx", { status: res.status, url });
     } else {
@@ -51,37 +64,73 @@ async function postNtfy(cfg: Config, msg: NtfyMessage): Promise<void> {
   }
 }
 
-export async function notifyStartup(cfg: Config): Promise<void> {
-  if (!cfg.ntfyTopic) {
-    log.info("ntfy not configured, skipping startup ping");
+const pushoverPriority: Record<NotificationLevel, "-1" | "0" | "1"> = {
+  info: "-1",
+  success: "0",
+  error: "1",
+};
+
+async function postPushover(cfg: Config, n: Notification): Promise<void> {
+  if (!cfg.pushoverToken || !cfg.pushoverUser) return;
+  const url = "https://api.pushover.net/1/messages.json";
+  const form = new URLSearchParams({
+    token: cfg.pushoverToken,
+    user: cfg.pushoverUser,
+    title: n.title,
+    message: n.body,
+    priority: pushoverPriority[n.level],
+  });
+  if (cfg.pushoverDevice) form.set("device", cfg.pushoverDevice);
+  log.info("Posting Pushover notification", { title: n.title, priority: pushoverPriority[n.level] });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      log.warn("Pushover returned non-2xx", { status: res.status, body: text.slice(0, 200) });
+    } else {
+      log.info("Pushover delivered", { status: res.status });
+    }
+  } catch (err) {
+    log.warn("Pushover delivery failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function dispatch(cfg: Config, n: Notification): Promise<void> {
+  const tasks: Promise<void>[] = [];
+  if (cfg.ntfyTopic) tasks.push(postNtfy(cfg, n));
+  if (cfg.pushoverToken && cfg.pushoverUser) tasks.push(postPushover(cfg, n));
+  if (tasks.length === 0) {
+    log.info("No notification channels configured, skipping", { title: n.title });
     return;
   }
-  await postNtfy(cfg, {
+  await Promise.all(tasks);
+}
+
+export async function notifyStartup(cfg: Config): Promise<void> {
+  await dispatch(cfg, {
+    level: "info",
     title: "hetzner-auto-rescale gestartet",
     body: `Service ist online und beobachtet Server mit Label '${cfg.labelKey}'.`,
-    tags: "white_check_mark",
-    priority: "low",
   });
 }
 
 export async function notifyRescale(cfg: Config, event: RescaleEvent): Promise<void> {
-  if (!cfg.ntfyTopic) {
-    log.info("ntfy not configured, skipping rescale notification", { server: event.server });
-    return;
-  }
-  await postNtfy(cfg, {
+  await dispatch(cfg, {
+    level: "success",
     title: `Hetzner Rescale: ${event.server} -> ${event.to}`,
     body: `Server "${event.server}" wurde von ${event.from} auf ${event.to} rescaled (${event.datacenter}).`,
-    tags: "rocket,hetzner",
-    priority: "default",
   });
 }
 
 const errorCooldown = new Map<string, number>();
 
 export async function notifyError(cfg: Config, context: string, err: unknown): Promise<void> {
-  if (!cfg.ntfyTopic) return;
-
   const message = err instanceof Error ? err.message : String(err);
   const cooldownKey = `${context}::${message}`;
   const now = Date.now();
@@ -96,10 +145,9 @@ export async function notifyError(cfg: Config, context: string, err: unknown): P
   }
   errorCooldown.set(cooldownKey, now);
 
-  await postNtfy(cfg, {
+  await dispatch(cfg, {
+    level: "error",
     title: `Hetzner-Rescale Fehler: ${context}`,
     body: `Kontext: ${context}\n\n${message}`,
-    tags: "warning",
-    priority: "high",
   });
 }

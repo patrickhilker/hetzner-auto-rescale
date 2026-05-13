@@ -188,6 +188,7 @@ async function main(): Promise<void> {
     actionTimeoutSec: cfg.actionTimeoutMs / 1000,
     dryRun: cfg.dryRun,
     ntfyEnabled: cfg.ntfyTopic !== undefined,
+    pushoverEnabled: cfg.pushoverToken !== undefined && cfg.pushoverUser !== undefined,
     errorNotifyCooldownSec: cfg.errorNotifyCooldownMs / 1000,
   });
 

@@ -41,13 +41,18 @@ Der Service läuft dauerhaft und pollt weiter, auch wenn aktuell kein Server mar
 
 ## Notifications
 
-Wenn `NTFY_TOPIC` gesetzt ist, geht jeweils eine Push-Notification an [ntfy.sh](https://ntfy.sh) (Standard) oder via `NTFY_SERVER` an eine selbst gehostete Instanz raus:
+Notifications werden an folgenden Stellen ausgelöst:
 
 - **Beim Start** des Services (einmaliger Test, abschaltbar via `NOTIFY_ON_START=false`)
 - **Bei erfolgreichem Rescale** eines Servers
 - **Bei Fehlern** während des Pollings oder Rescales — mit Cooldown gegen Spam (`ERROR_NOTIFY_COOLDOWN_SECONDS`, default 1800s pro identischer Fehlermeldung+Kontext)
 
-Authentifizierung wahlweise per Access Token (`NTFY_TOKEN`) oder Basic Auth (`NTFY_USER` + `NTFY_PASSWORD`).
+Unterstützte Kanäle (beliebig kombinierbar; ohne Konfiguration kein Versand):
+
+| Kanal | Aktivierung | Authentifizierung |
+|-------|-------------|--------------------|
+| [ntfy](https://ntfy.sh) | `NTFY_TOPIC` (+ optional `NTFY_SERVER` für self-hosted) | `NTFY_TOKEN` oder `NTFY_USER`+`NTFY_PASSWORD` |
+| [Pushover](https://pushover.net) | `PUSHOVER_TOKEN` (App-API-Token) + `PUSHOVER_USER` (User/Group-Key) | über die beiden Werte selbst | 
 
 ## Typen
 
