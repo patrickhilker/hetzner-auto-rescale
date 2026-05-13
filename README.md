@@ -13,11 +13,14 @@ Pollt die Hetzner Cloud API und rescaled markierte Server automatisch auf den er
 
 Statt feste IDs/Target-Listen in ENV-Vars zu hinterlegen, liest der Service die Konfiguration aus einem Label am Server in der Hetzner Console:
 
-| Label                              | Bedeutung                                                                |
-|------------------------------------|---------------------------------------------------------------------------|
-| `hetzner-auto-rescale/targets`     | Priorisierte Liste der gewünschten Ziel-Server-Typen, durch `_` getrennt |
+| Label                                 | Bedeutung                                                                                              |
+|---------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `hetzner-auto-rescale/targets`        | Priorisierte Liste der gewünschten Ziel-Server-Typen, durch `_` getrennt                               |
+| `hetzner-auto-rescale/upgrade-disk`   | Optional. `true`/`yes`/`1` ⇒ Rescale mit `upgrade_disk: true`. Default: `false` (Downgrade bleibt möglich) |
 
-Beispielwert: `ccx33_ccx23` (versuche `ccx33`, fallback `ccx23`).
+Beispielwert für `targets`: `ccx33_ccx23` (versuche `ccx33`, fallback `ccx23`).
+
+> ⚠️ **`upgrade-disk`**: Setzt die Disk auf die Größe des neuen Typs. Hetzner sperrt danach **dauerhaft** Downgrades auf kleinere Typen mit kleinerer Disk. Filesystem/Partition wachsen je nach Image (cloud-init/growpart) ggf. automatisch beim nächsten Boot — sonst manuell mit `growpart` + `resize2fs`/`xfs_growfs` nachziehen.
 
 > Hetzner-Label-Werte dürfen nur `[a-zA-Z0-9_.-]` enthalten, daher als Separator `_` (anpassbar über `TARGETS_SEPARATOR`).
 
@@ -31,7 +34,7 @@ In jedem Poll-Intervall:
 3. Falls ein Ziel-Typ verfügbar ist:
    - Server-Status merken (`running` / `off`)
    - Falls `running`: `poweroff` → auf Action-Erfolg warten
-   - `change_type` mit `upgrade_disk: false` (damit später Downgrades möglich bleiben)
+   - `change_type` — `upgrade_disk` standardmäßig `false` (damit später Downgrades möglich bleiben); pro Server via Label `hetzner-auto-rescale/upgrade-disk=true` aktivierbar
    - Falls vorher `running`: `poweron`
    - **Label am Server entfernen**, damit dieser Server nicht erneut behandelt wird
    - Notification senden (siehe unten)

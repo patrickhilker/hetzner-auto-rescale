@@ -25,6 +25,11 @@ function parseTargets(value: string, separator: string): string[] {
     .filter((s) => s.length > 0);
 }
 
+function parseUpgradeDiskLabel(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["true", "yes", "1"].includes(value.trim().toLowerCase());
+}
+
 interface PickedTarget {
   type: ServerTypeInfo;
 }
@@ -141,21 +146,35 @@ async function processServer(
     return false;
   }
 
+  const upgradeDisk = parseUpgradeDiskLabel(server.labels[cfg.upgradeDiskLabelKey]);
+
   log.info("Target server type available for migration", {
     server: server.name,
     target: match.type.name,
     cores: match.type.cores,
     memoryGiB: match.type.memory,
     diskGB: match.type.disk,
+    upgradeDisk,
   });
 
   if (cfg.dryRun) {
-    log.info("DRY_RUN enabled, would rescale", { server: server.name, target: match.type.name });
+    log.info("DRY_RUN enabled, would rescale", {
+      server: server.name,
+      target: match.type.name,
+      upgradeDisk,
+    });
     return false;
   }
 
   const rescaleStart = Date.now();
-  await rescaleServer(client, server, match.type.name, cfg.actionPollIntervalMs, cfg.actionTimeoutMs);
+  await rescaleServer(
+    client,
+    server,
+    match.type.name,
+    upgradeDisk,
+    cfg.actionPollIntervalMs,
+    cfg.actionTimeoutMs,
+  );
   log.info("Rescale flow completed", {
     server: server.name,
     target: match.type.name,
@@ -182,6 +201,7 @@ async function main(): Promise<void> {
 
   log.info("Starting hetzner-auto-rescale", {
     labelKey: cfg.labelKey,
+    upgradeDiskLabelKey: cfg.upgradeDiskLabelKey,
     separator: cfg.targetsSeparator,
     pollIntervalSec: cfg.pollIntervalMs / 1000,
     actionPollIntervalSec: cfg.actionPollIntervalMs / 1000,
