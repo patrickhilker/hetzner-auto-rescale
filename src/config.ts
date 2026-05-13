@@ -10,6 +10,9 @@ export interface Config {
   ntfyToken: string | undefined;
   ntfyUser: string | undefined;
   ntfyPassword: string | undefined;
+  pushoverToken: string | undefined;
+  pushoverUser: string | undefined;
+  pushoverDevice: string | undefined;
   notifyOnStart: boolean;
   errorNotifyCooldownMs: number;
   dryRun: boolean;
@@ -60,6 +63,9 @@ export function loadConfig(): Config {
     ntfyToken: optional("NTFY_TOKEN"),
     ntfyUser: optional("NTFY_USER"),
     ntfyPassword: optional("NTFY_PASSWORD"),
+    pushoverToken: optional("PUSHOVER_TOKEN"),
+    pushoverUser: optional("PUSHOVER_USER"),
+    pushoverDevice: optional("PUSHOVER_DEVICE"),
     notifyOnStart: optional("NOTIFY_ON_START") !== "false",
     errorNotifyCooldownMs:
       (optional("ERROR_NOTIFY_COOLDOWN_SECONDS")

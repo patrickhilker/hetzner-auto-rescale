@@ -8,6 +8,15 @@ export interface RescaleEvent {
   datacenter: string;
 }
 
+type Priority = "min" | "low" | "default" | "high" | "max";
+
+interface Message {
+  title: string;
+  body: string;
+  tags: string;
+  priority: Priority;
+}
+
 function ntfyAuthHeader(cfg: Config): string | undefined {
   if (cfg.ntfyToken) return `Bearer ${cfg.ntfyToken}`;
   if (cfg.ntfyUser && cfg.ntfyPassword) {
@@ -17,14 +26,7 @@ function ntfyAuthHeader(cfg: Config): string | undefined {
   return undefined;
 }
 
-interface NtfyMessage {
-  title: string;
-  body: string;
-  tags: string;
-  priority: "min" | "low" | "default" | "high" | "max";
-}
-
-async function postNtfy(cfg: Config, msg: NtfyMessage): Promise<void> {
+async function postNtfy(cfg: Config, msg: Message): Promise<void> {
   if (!cfg.ntfyTopic) return;
   const url = `${cfg.ntfyServer.replace(/\/+$/, "")}/${encodeURIComponent(cfg.ntfyTopic)}`;
   const headers: Record<string, string> = {
@@ -51,12 +53,70 @@ async function postNtfy(cfg: Config, msg: NtfyMessage): Promise<void> {
   }
 }
 
+function pushoverPriority(p: Priority): string {
+  switch (p) {
+    case "min":
+      return "-2";
+    case "low":
+      return "-1";
+    case "default":
+      return "0";
+    case "high":
+      return "1";
+    case "max":
+      return "2";
+  }
+}
+
+async function postPushover(cfg: Config, msg: Message): Promise<void> {
+  if (!cfg.pushoverToken || !cfg.pushoverUser) return;
+  const url = "https://api.pushover.net/1/messages.json";
+  const params = new URLSearchParams({
+    token: cfg.pushoverToken,
+    user: cfg.pushoverUser,
+    title: msg.title,
+    message: msg.body,
+    priority: pushoverPriority(msg.priority),
+  });
+  if (cfg.pushoverDevice) params.set("device", cfg.pushoverDevice);
+  // Pushover priority 2 requires retry+expire.
+  if (msg.priority === "max") {
+    params.set("retry", "60");
+    params.set("expire", "3600");
+  }
+  log.info("Posting pushover notification", { title: msg.title, priority: msg.priority });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    if (!res.ok) {
+      log.warn("pushover returned non-2xx", { status: res.status });
+    } else {
+      log.info("pushover delivered", { status: res.status });
+    }
+  } catch (err) {
+    log.warn("pushover delivery failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function notifyConfigured(cfg: Config): boolean {
+  return Boolean(cfg.ntfyTopic) || Boolean(cfg.pushoverToken && cfg.pushoverUser);
+}
+
+async function dispatch(cfg: Config, msg: Message): Promise<void> {
+  await Promise.all([postNtfy(cfg, msg), postPushover(cfg, msg)]);
+}
+
 export async function notifyStartup(cfg: Config): Promise<void> {
-  if (!cfg.ntfyTopic) {
-    log.info("ntfy not configured, skipping startup ping");
+  if (!notifyConfigured(cfg)) {
+    log.info("no notification backend configured, skipping startup ping");
     return;
   }
-  await postNtfy(cfg, {
+  await dispatch(cfg, {
     title: "hetzner-auto-rescale gestartet",
     body: `Service ist online und beobachtet Server mit Label '${cfg.labelKey}'.`,
     tags: "white_check_mark",
@@ -65,11 +125,11 @@ export async function notifyStartup(cfg: Config): Promise<void> {
 }
 
 export async function notifyRescale(cfg: Config, event: RescaleEvent): Promise<void> {
-  if (!cfg.ntfyTopic) {
-    log.info("ntfy not configured, skipping rescale notification", { server: event.server });
+  if (!notifyConfigured(cfg)) {
+    log.info("no notification backend configured, skipping rescale notification", { server: event.server });
     return;
   }
-  await postNtfy(cfg, {
+  await dispatch(cfg, {
     title: `Hetzner Rescale: ${event.server} -> ${event.to}`,
     body: `Server "${event.server}" wurde von ${event.from} auf ${event.to} rescaled (${event.datacenter}).`,
     tags: "rocket,hetzner",
@@ -80,7 +140,7 @@ export async function notifyRescale(cfg: Config, event: RescaleEvent): Promise<v
 const errorCooldown = new Map<string, number>();
 
 export async function notifyError(cfg: Config, context: string, err: unknown): Promise<void> {
-  if (!cfg.ntfyTopic) return;
+  if (!notifyConfigured(cfg)) return;
 
   const message = err instanceof Error ? err.message : String(err);
   const cooldownKey = `${context}::${message}`;
@@ -96,7 +156,7 @@ export async function notifyError(cfg: Config, context: string, err: unknown): P
   }
   errorCooldown.set(cooldownKey, now);
 
-  await postNtfy(cfg, {
+  await dispatch(cfg, {
     title: `Hetzner-Rescale Fehler: ${context}`,
     body: `Kontext: ${context}\n\n${message}`,
     tags: "warning",
