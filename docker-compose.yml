@@ -1,5 +1,5 @@
 services:
-  auto-rescale:
+  app:
     image: ghcr.io/patrickhilker/hetzner-auto-rescale:latest
     restart: unless-stopped
     env_file: .env
