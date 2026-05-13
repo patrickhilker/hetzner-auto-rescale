@@ -68,10 +68,18 @@ pnpm dev
 
 ## Mit Docker
 
+Lokal bauen und starten:
+
 ```bash
 cp .env.example .env
 # .env ausfüllen (HCLOUD_TOKEN reicht)
 docker compose up --build
 ```
 
-Der Container läuft mit `restart: unless-stopped` und pollt dauerhaft die Hetzner API.
+Oder das bereits gebaute Image aus dem GitHub Container Registry ziehen:
+
+```bash
+docker run --rm --env-file .env ghcr.io/patrickhilker/hetzner-auto-rescale:latest
+```
+
+Der Container läuft mit `restart: unless-stopped` und pollt dauerhaft die Hetzner API. Builds passieren via GitHub Actions automatisch für jeden Push auf `main` (Tags: `latest`, `main`, `sha-<short>`) und für Release-Tags wie `v1.2.3`.
