@@ -23,8 +23,8 @@ export interface LabeledServer {
   status: string;
   currentTypeId: number;
   currentTypeName: string;
-  datacenterId: number;
-  datacenterName: string;
+  locationId: number;
+  locationName: string;
   labels: Record<string, string>;
 }
 
@@ -45,8 +45,8 @@ export async function listLabeledServers(client: HCloudClient, labelKey: string)
         status: s.status,
         currentTypeId: s.server_type.id,
         currentTypeName: s.server_type.name,
-        datacenterId: s.datacenter.id,
-        datacenterName: s.datacenter.name,
+        locationId: s.location.id,
+        locationName: s.location.name,
         labels: s.labels,
       });
     }
@@ -85,14 +85,35 @@ export async function listServerTypes(client: HCloudClient): Promise<ServerTypeI
   return result;
 }
 
-export async function getAvailableForMigration(client: HCloudClient, datacenterId: number): Promise<number[]> {
-  const { data, error } = await client.GET("/datacenters/{id}", {
-    params: { path: { id: datacenterId } },
-  });
-  if (error || !data || !data.datacenter) {
-    throw new HCloudApiError(`Failed to fetch datacenter ${datacenterId}`, error);
+/**
+ * Returns the IDs of server types that are currently available in the given location.
+ *
+ * Hetzner removed the embedded `datacenter` object (and its
+ * `server_types.available_for_migration` list) from Server responses on
+ * 2026-07-01. The per-location `server_type.locations[].available` flag is the
+ * official replacement for both `available` and `available_for_migration`
+ * (see Hetzner Cloud changelog, 2026-04-01). It is only an indicator of current
+ * availability, not a guarantee, so the actual change_type may still be rejected.
+ */
+export async function getAvailableTypesForLocation(client: HCloudClient, locationId: number): Promise<number[]> {
+  const result: number[] = [];
+  let page = 1;
+  for (;;) {
+    const { data, error } = await client.GET("/server_types", {
+      params: { query: { page, per_page: 50 } },
+    });
+    if (error || !data) {
+      throw new HCloudApiError(`Failed to list server types for location ${locationId}`, error);
+    }
+    for (const t of data.server_types) {
+      const loc = t.locations.find((l) => l.id === locationId);
+      if (loc?.available) result.push(t.id);
+    }
+    const nextPage = data.meta?.pagination?.next_page;
+    if (!nextPage) break;
+    page = nextPage;
   }
-  return data.datacenter.server_types.available_for_migration;
+  return result;
 }
 
 interface ActionRef {

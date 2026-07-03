@@ -1,7 +1,7 @@
 import { loadConfig, type Config } from "./config.js";
 import { createHCloudClient, type HCloudClient } from "./client.js";
 import {
-  getAvailableForMigration,
+  getAvailableTypesForLocation,
   listLabeledServers,
   listServerTypes,
   rescaleServer,
@@ -63,7 +63,7 @@ async function processServer(
     id: server.id,
     currentType: server.currentTypeName,
     status: server.status,
-    datacenter: server.datacenterName,
+    location: server.locationName,
   });
 
   const labelValue = server.labels[cfg.labelKey];
@@ -97,12 +97,12 @@ async function processServer(
     return true;
   }
 
-  log.info("Querying datacenter availability", {
+  log.info("Querying location availability", {
     server: server.name,
-    datacenter: server.datacenterName,
-    datacenterId: server.datacenterId,
+    location: server.locationName,
+    locationId: server.locationId,
   });
-  const available = await getAvailableForMigration(client, server.datacenterId);
+  const available = await getAvailableTypesForLocation(client, server.locationId);
   const availableSet = new Set(available);
 
   const availableTargetNames: string[] = [];
@@ -121,9 +121,9 @@ async function processServer(
     }
   }
 
-  log.info("Datacenter migration availability", {
+  log.info("Location migration availability", {
     server: server.name,
-    datacenter: server.datacenterName,
+    location: server.locationName,
     availableForMigrationCount: available.length,
     targetsAvailable: availableTargetNames.join(",") || "(none)",
     targetsUnavailable: unavailableTargetNames.join(",") || "(none)",
@@ -188,7 +188,7 @@ async function processServer(
     server: server.name,
     from: server.currentTypeName,
     to: match.type.name,
-    datacenter: server.datacenterName,
+    location: server.locationName,
   });
   log.info("Notifications dispatched", { server: server.name });
 

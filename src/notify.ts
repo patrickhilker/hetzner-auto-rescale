@@ -5,7 +5,7 @@ export interface RescaleEvent {
   server: string;
   from: string;
   to: string;
-  datacenter: string;
+  location: string;
 }
 
 type NotificationLevel = "info" | "success" | "error";
@@ -124,7 +124,7 @@ export async function notifyRescale(cfg: Config, event: RescaleEvent): Promise<v
   await dispatch(cfg, {
     level: "success",
     title: `Hetzner Rescale: ${event.server} -> ${event.to}`,
-    body: `Server "${event.server}" wurde von ${event.from} auf ${event.to} rescaled (${event.datacenter}).`,
+    body: `Server "${event.server}" wurde von ${event.from} auf ${event.to} rescaled (${event.location}).`,
   });
 }
 

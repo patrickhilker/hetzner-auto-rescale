@@ -6,7 +6,7 @@
   "description": "Watches Hetzner Cloud for availability of a higher server type and rescales automatically.",
   "packageManager": "pnpm@10.33.4",
   "scripts": {
-    "generate": "openapi-typescript https://raw.githubusercontent.com/MaximilianKoestler/hcloud-openapi/v0.28.0/openapi/hcloud.json -o src/generated/hcloud.d.ts",
+    "generate": "openapi-typescript https://docs.hetzner.cloud/cloud.spec.json -o src/generated/hcloud.d.ts",
     "build": "tsc",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "dev": "tsx --env-file-if-exists=.env src/index.ts",
